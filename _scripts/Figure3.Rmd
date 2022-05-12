@@ -1,0 +1,66 @@
+---
+title: "Figure3"
+author: "Leslie Roberson"
+date: "28/01/2022"
+output: html_document
+---
+
+
+## Summary
+
+This is the data and code needed to reproduce the raw version of Figure 3 (plot of bycatch species pairs correlation coefficients). 
+
+Final formatting (fonts, adjusting y axis and legend labels) was done in Adobe Illustrator.
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(forcats)
+library(lisa)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## prep data
+
+```{r prep data}
+
+fig3.dat <- read_csv("_data/fig3_dat.csv")
+glimpse(fig3.dat)
+# mean_cc: average of 1000 bootstrapped correlation coefficient estimates
+# pairs_plot: the bycatch_type/fishery pairs
+# fishery: ETBF = tuna longlines, GNS= set gillnets, LLA = demersal longlines, OTB = otter bottom trawl, NPF = prawn trawl
+
+## color palette
+pal_fishery <- lisa::lisa_palette("MarcChagall", 5, "discrete")
+
+## reorder pairs by fishery then mean CC value
+fig3.dat <- fig3.dat %>% arrange(fishery, desc(mean_cc))
+fig3.dat$pairs_plot <- as_factor(fig3.dat$pairs_plot)
+levels(fig3.dat$pairs_plot)
+
+```
+
+## plot
+horizontal bar plot
+
+```{r}
+
+fig3.plot <- fig3.dat %>%
+  ggplot() +
+  geom_bar(aes(x=pairs_plot, y=mean_cc, fill=fishery), stat="identity") +
+  geom_errorbar(aes(x=pairs_plot, ymin=quant_0, ymax=quant_100), colour="black") +
+  # reverse axis so larger CCs are at top 
+  scale_x_discrete(limits = rev) +
+  coord_flip() +
+  scale_fill_manual(values=pal_fishery) +
+  labs(y="Correlation coefficient", x = "") +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.background = element_rect(fill="NA", color="black"))
+
+fig3.plot
+
+```
+

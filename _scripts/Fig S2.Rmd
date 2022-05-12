@@ -1,0 +1,182 @@
+---
+title: "Fig S2"
+author: "Leslie Roberson"
+date: "28/01/2022"
+output: html_document
+---
+
+## Summary
+
+Here I make 5 separate SI plots to show the p-vals and SEs for all the regression coeffs (table is too long - 42 pages). This is the same plot as Figure 2 in teh main text, but with the standard error information
+
+Final formatting (fonts, fishery labels for facets, position of shape legend, axis labels) was done in Adobe Illustrator.
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(pillar)
+library(purrr)
+library(forcats)
+library(cowplot)
+library(ggrepel)
+library(scales)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## prep data
+
+```{r prep data}
+
+figS2.dat <- read_csv("_data/figS2_dat.csv")
+glimpse(figS2.dat)
+
+## set colors for species
+# put in alphabetical order
+figS2.dat$species <- fct_relevel(figS2.dat$species, 
+            levels = c("Albatrosses","Dolphins","Hammerheads","Petrels","Pinnipeds","Seasnakes","Shearwaters","Shortfin makos"))
+pal_distinct8 <- c("#0073D2FF","#8F7700FF","#7876B1FF","#61221a","#CD534CFF","#272928","#EFC000FF","#868686FF")
+
+## mutate factor for p-val significance
+figS2.dat <- figS2.dat %>%  mutate(signif = case_when(p_val<0.05~as.character("Yes"), TRUE~as.character("No")))
+table(figS2.dat$signif)
+#  No Yes 
+# 944  52 
+
+## root transform the SEs 
+figS2.dat <- figS2.dat %>% mutate(SE_3rt=SE^(1/3))
+
+
+```
+
+## Plot
+
+Thanks to this page: http://www.sthda.com/english/wiki/wiki.php?id_contents=7930#arranging-multiple-graphs-using-cowplot
+
+```{r si2 plot}
+
+## set theme
+theme_coeffs <- theme(panel.grid = element_blank(),
+          panel.background = element_rect(fill = NA, color = "black"),
+          strip.background = element_rect(fill = "white", color="black"),
+          legend.title=element_blank(),
+          legend.key = element_rect(fill = NA),
+          legend.margin=margin(t = 0, unit='cm'), # reduce margin around legend
+          legend.spacing.x = unit(0.01, 'cm'),
+          legend.text = element_text(margin = margin(t = 1)),
+          legend.position="right",
+          axis.title.y=element_blank(), # do all labeling in illustrator
+          axis.text.x=element_blank(),
+          axis.title.x=element_blank(),
+          axis.ticks.x=element_blank())
+
+## plot each panel separately and then arrange
+
+## shape
+show_point_shapes() + theme_minimal()
+
+## Set gillnets
+p.gns <- figS2.dat %>%
+    filter(fishery_lab=="Set gillnets") %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=species, color=species), alpha=0.5) +
+    geom_point(aes(color=species, shape=signif), size=2) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE_3rt, ymax=reg.coeff+SE_3rt,
+                      color=species), alpha = 0.8, size=0.2) +
+    scale_color_manual(values = c("Albatrosses"="#0073D2FF", "Dolphins"="#8F7700FF")) +
+    scale_shape_manual(values=c('No'=4, 'Yes'=19), labels=c("p>0.5", "p<0.05*")) +
+    scale_x_discrete(expand=c(0.02,0.02)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    theme_coeffs +
+    guides(shape=FALSE)
+p.gns
+
+## Demersal longlines
+p.lla <- figS2.dat %>%
+    filter(fishery_lab=="Demersal longlines") %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=species, color=species), alpha=0.5) +
+    geom_point(aes(color=species, shape=signif), size=2) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE_3rt, ymax=reg.coeff+SE_3rt,
+                      color=species), alpha = 0.8, size=0.2) +
+    scale_color_manual(values = c("Albatrosses"="#0073D2FF", "Petrels"="#61221a", "Shearwaters"="#EFC000FF")) +
+    scale_shape_manual(values=c('Yes'=19, 'No'=4)) +
+    scale_x_discrete(expand=c(0.02,0.02)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    theme_coeffs +  
+    guides(shape=FALSE) 
+p.lla
+
+## Otter bottom trawl
+p.otb <- figS2.dat %>%
+    filter(fishery_lab=="Otter bottom trawl") %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=species, color=species), alpha=0.5) +
+    geom_point(aes(color=species, shape=signif), size=2) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE_3rt, ymax=reg.coeff+SE_3rt,
+                      color=species), alpha = 0.8, size=0.2) +
+    scale_color_manual(values = c("Albatrosses"="#0073D2FF", "Petrels"="#61221a", "Shearwaters"="#EFC000FF", "Pinnipeds"="#CD534CFF")) +
+    scale_shape_manual(values=c('Yes'=19, 'No'=4)) +
+    scale_x_discrete(expand=c(0.02,0.02)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    theme_coeffs +  
+    guides(shape=FALSE) 
+p.otb
+
+## Tuna longlines
+p.etbf <- figS2.dat %>%
+    filter(fishery_lab=="Tuna longlines") %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=species, color=species), alpha=0.5) +
+    geom_point(aes(color=species, shape=signif), size=2) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE_3rt, ymax=reg.coeff+SE_3rt,
+                      color=species), alpha = 0.8, size=0.2) +
+    scale_color_manual(values = c("Albatrosses"="#0073D2FF", "Petrels"="#61221a", "Shearwaters"="#EFC000FF", "Shortfin makos"="#868686FF")) +
+    scale_shape_manual(values=c('Yes'=19, 'No'=4)) +
+    scale_x_discrete(expand=c(0.02,0.02)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    theme_coeffs +  
+    guides(shape=FALSE) 
+p.etbf
+
+## prawn trawl
+p.npf <- figS2.dat %>%
+  filter(fishery_lab=="Prawn trawl") %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=species, color=species), alpha=0.5) +
+    geom_point(aes(color=species, shape=signif), size=2) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE_3rt, ymax=reg.coeff+SE_3rt,
+                      color=species), alpha = 0.8, size=0.2) +
+    scale_color_manual(values = c("Hammerheads"="#7876B1FF", "Seasnakes"="#272928")) +
+    scale_shape_manual(values=c('Yes'=19, 'No'=4)) +
+    scale_x_discrete(expand=c(0.02,0.02)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    theme_coeffs +  
+    guides(shape=FALSE)  
+p.npf
+
+##<><> extract shape legend (for p values)
+plot.temp <- figS2.dat %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_point(aes(shape=signif)) +
+    scale_shape_manual(values=c('No'=4, 'Yes'=19), labels=c("p > 0.5", "p < 0.05*")) +
+    labs(shape=NULL) +
+    theme_bw() +
+    theme(legend.position="top") +
+    guides(shape = guide_legend(override.aes = list(size=4)))
+leg.shape <- get_legend(plot.temp)
+as_ggplot(leg.shape)
+## save and add in Illustrator
+
+##<><>><<>< Arrange plots
+p.grid <- plot_grid(p.gns, p.lla, p.otb, p.etbf, p.npf, 
+          nrow=5, align="v",rel_widths=c(1,1,1,1,1))
+plot(p.grid)
+
+```
+
