@@ -1,0 +1,129 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(here)
+library(lisa) # install.packages("lisa")
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# prep data for plot
+
+```{r prep}
+# now back to 15 models with significant vessel effect for v10 final
+reg.coeffs <- read_csv(here("_data/Figures_2_S2.csv"))
+names(reg.coeffs)
+
+## prep factors
+reg.coeffs$species <- as_factor(reg.coeffs$species)
+
+## Make fishery labels factor
+reg.coeffs$fishery <- fct_relevel(reg.coeffs$fishery, 
+                                 c("GNS","LLA","OTB","ETBF","NPF"))
+reg.coeffs$fishery_lab <- fct_recode(reg.coeffs$fishery, 
+                                 "Set gillnets" = "GNS",
+                                 "Demersal longlines" ="LLA",
+                                 "Otter bottom trawl" = "OTB",
+                                 "Tuna longlines" = "ETBF",
+                                 "Prawn trawl" = "NPF")
+## set colors for species
+# put in alphabetical order
+reg.coeffs$species <- fct_relevel(reg.coeffs$species, 
+            c("Dolphins", "Gulper sharks", "Hammerhead sharks", "Pinnipeds","Sawfishes", "School shark", "Seabirds", "Sea snakes", "Sea turtles", "Shortfin mako", "Syngnathids"))
+
+# https://sashamaps.net/docs/resources/20-colors/
+pal_sasha11 <- c("#800000", "#aaffc3", "#469990", "#f032e6", "#4363d8", "#42d4f4","#000000", "#f58231", "#3cb44b", "#a9a9a9", "#ffe119")
+
+```
+
+## Figure 2 
+
+```{r plot Fig2}
+
+fig2 <- reg.coeffs %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=coeff_norm)) +
+    geom_line(aes(group=species, color=species)) +
+    # show the data points on the line
+    geom_point(aes(color=species), size=0.5) + 
+    scale_color_manual(values = pal_sasha11) +
+    facet_wrap(~fishery_lab, 
+               nrow=2, scale="free_x") + # only show y axis on left
+    scale_y_continuous(expand=c(0.05, 0.05)) +
+    scale_x_discrete(expand=c(0.1,0.1)) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    labs(x="Vessel rank", y="Standardized coefficient") +
+    theme(panel.grid = element_blank(),
+          panel.background = element_rect(fill = NA, color = "black"),
+          strip.background = element_rect(fill = "white", color="black"),
+          legend.position = c(0.89, 0.25),
+          legend.text = element_text(size=8),
+          legend.title=element_blank(),
+          legend.key = element_rect(fill = NA),
+          legend.key.size = unit(0.5, 'cm'),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +  # keep ticks to show how many vessels there are
+    guides(color=guide_legend(override.aes = list(size = 3))) + 
+  theme(legend.position = "none") # note that legend was formatted in Adobe Illustrator
+fig2
+
+```
+
+## SI Figure 2
+```{r Fig SI 2}
+
+## mutate factor for p-val significance
+si2.dat <- reg.coeffs %>%  mutate(signif = case_when(p_val<0.05~as.character("Yes"), TRUE~as.character("No")))
+table(si2.dat$signif)
+#  No Yes 
+# 759 112 
+
+si2.dat <- si2.dat %>%  mutate(fishery_spp=paste0(fishery, " ", species))
+
+pal_fishery <- lisa_palette("MarcChagall", 5, "discrete")
+
+theme_coeffs15 <- theme(panel.grid = element_blank(),
+          panel.background = element_rect(fill = NA, color = "black"),
+          strip.background = element_rect(fill = "white", color="black"),
+          strip.text.x = element_text(margin = margin(2, 0, 2, 0), size=9),
+          axis.text.y = element_text(size = 7.5),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(), 
+          legend.position=c(0.88, 0.13), # inside the missing facet
+          legend.spacing.y = unit(-0.05, "cm"),# Change the spacing between legend items here
+          legend.text = element_text(size =9),
+          legend.margin=margin(0,0,0,0),
+          legend.box.margin=margin(-5,-5,-5,-5),
+          legend.title=element_blank(),
+          legend.key = element_rect(fill = NA)
+          )
+
+# get facet order right to match fig 1
+unique(si2.dat$fishery_spp)
+si2.dat$fishery_spp <- factor(si2.dat$fishery_spp, levels=c("GNS Dolphins","GNS Hammerhead sharks", "GNS Seabirds", "LLA Gulper sharks", "LLA School shark", "LLA Seabirds", "OTB Pinnipeds", "OTB Seabirds", "ETBF Sea turtles", "ETBF Seabirds", "ETBF Shortfin mako", "NPF Hammerhead sharks",  "NPF Sawfishes", "NPF Sea snakes", "NPF Syngnathids"))
+
+figS2 <- si2.dat %>%
+    ggplot(aes(x=reorder(rank_coeff, -rank_coeff), y=reg.coeff)) +
+    geom_line(aes(group=fishery_lab, color=fishery_lab), alpha=0.5) +
+    geom_point(aes(color=fishery_lab, shape=signif), size=1.5) +
+    geom_errorbar(aes(reorder(rank_coeff, -rank_coeff), 
+                      y=reg.coeff, ymin=reg.coeff-SE, ymax=reg.coeff+SE, 
+                      color=fishery_lab), alpha=0.5, size=0.2) +
+    scale_color_manual(values=pal_fishery) +
+    scale_shape_manual(values=c('No'=4, 'Yes'=19), labels=c("p>0.5", "p<0.05*")) +
+    geom_hline(yintercept = 0, size=0.3, color="black") +
+    facet_wrap(~fishery_spp,
+               scales= "free",
+               labeller=as_labeller(c('ETBF Seabirds'="Seabirds", `ETBF Sea turtles`="Sea turtles", `ETBF Shortfin mako`="Shortfin mako", `NPF Syngnathids`="Syngnathids", `NPF Hammerhead sharks`="Hammerhead sharks", `NPF Sea snakes`="Sea snakes", `NPF Sawfishes`="Sawfishes", `OTB Seabirds`="Seabirds", `OTB Pinnipeds`="Pinnipeds", `LLA Seabirds`="Seabirds", `LLA Gulper sharks`="Gulper sharks", `LLA School shark`="School shark", `GNS Seabirds`="Seabirds", `GNS Hammerhead sharks`="Hammerhead sharks", `GNS Dolphins`="Dolphins"))) +
+    labs(x="Vessel rank", y="Regression coefficient") + 
+    theme_coeffs15 +
+    guides(#color=FALSE,
+      shape="none")
+figS2
+
+```

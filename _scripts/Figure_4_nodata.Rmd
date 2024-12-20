@@ -1,0 +1,71 @@
+---
+title: "Figure4"
+author: "Leslie Roberson"
+date: "28/01/2022"
+output: html_document
+---
+
+## Summary
+
+As per the Deed of Confidentiality with AFMA, we are not permitted to provide the data showing summary statistics for individual vessels.
+
+For the sake of transparency, we show the code used to make the figure, although it is not reproducible without the data.
+
+Note that final formatting (fonts, bycatch species icons) was done in Adobe Illustrator.
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(here)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Bycatch ratio divided by max of that fishery/species 
+But with one panel for each species (colors for fisheries)
+
+```{r fig4 plot}
+
+names(fig4.dat) # not publicly available
+
+pal_fishery <- lisa_palette("MarcChagall", 5, "discrete")
+
+fig4 <- fig4.dat %>% 
+    group_by(Fishery_lab, shot_id, bycatch_type_label) %>%
+    # adjust zeros for log scale
+    mutate(target_catch=ifelse(target_catch==0, 0.1, target_catch),
+           byc_ratio = bycatch_cnt/target_catch) %>%
+    ungroup() %>%
+    group_by(fshry_spp, Year, vessel, Fishery_lab) %>%
+    summarise(avg_ratio=mean(byc_ratio)) %>%
+    ungroup() %>%
+    group_by(fshry_spp, Fishery_lab) %>%
+    mutate(avg_max=max(avg_ratio)) %>%
+    #distinct(Fishery_lab, bycatch_type_label, avg_max)
+    ggplot(aes(x=Year, y=avg_ratio/avg_max, color=Fishery_lab)) +
+    geom_point(aes(x=Year, y=avg_ratio/avg_max, color=Fishery_lab)) + 
+    scale_color_manual(values = pal_fishery) +
+  scale_y_continuous(expand=expand_scale(0,0.1)) +
+  scale_x_continuous(limits=c(2001,2021), breaks=c(2004, 2012, 2020)) +
+    facet_wrap(~fshry_spp, 
+               labeller = as_labeller(c('Tuna longlines Seabirds'="Seabirds", `Tuna longlines Sea turtles`="Sea turtles", `Tuna longlines Shortfin mako`="Shortfin mako", `Prawn trawl Syngnathids`="Syngnathids", `Prawn trawl Hammerhead sharks`="Hammerhead sharks", `Prawn trawl Sea snakes`="Sea snakes", `Prawn trawl Sawfishes`="Sawfishes", `Otter bottom trawl Seabirds`="Seabirds", `Otter bottom trawl Pinnipeds`="Pinnipeds", `Demersal longlines Seabirds`="Seabirds", `Demersal longlines Gulper sharks`="Gulper sharks", `Demersal longlines School shark`="School shark", `Set gillnets Seabirds`="Seabirds", `Set gillnets Hammerhead sharks`="Hammerhead sharks", `Set gillnets Dolphins`="Dolphins"))) + 
+    #scale_y_continuous(trans="pseudo_log",  breaks=pretty_breaks(n=6)) + 
+    labs(x = "Year", y = "Relative ratio of interactions to target catch") +
+    theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        legend.title= element_blank(),
+        legend.position=c(0.88, 0.08), # inside the missing facet
+        legend.text = element_text(size = 8.5),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-5,-5,-5),
+        legend.spacing.x = unit(-0.1, 'cm'),
+        legend.spacing.y = unit(-0.5, 'cm'),
+        #legend.text = element_text(margin = margin(r = 2, unit = "pt")),
+        strip.background =element_rect(fill="NA", color ="black"), # facet label boxes fill white instead of gray
+        panel.border = element_rect(fill = NA, color = "black"), # keep facet label borders
+        legend.key = element_rect(fill = NA)) 
+    #guides(color = guide_legend(byrow=TRUE, nrow=1, override.aes = list(size = 3)))
+fig4
+
+```
+

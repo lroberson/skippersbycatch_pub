@@ -1,0 +1,68 @@
+---
+title: "Figure1"
+author: "Leslie Roberson"
+date: "28/01/2022"
+output: html_document
+---
+
+## Summary
+
+As per the Deed of Confidentiality with AFMA, we are not permitted to provide the data showing summary statistics for individual vessels.
+
+For the sake of transparency, we show the code used to make the figure, although it is not reproducible without the data.
+
+Note that final formatting (fonts, bycatch species icons) was done in Adobe Illustrator.
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(here)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Make plot
+
+```{r fig1 plot}
+names(fig1.dat) # not publicly available
+
+pal_fishery <- lisa_palette("MarcChagall", 5, "discrete")
+
+fig1.p <- fig1.dat %>%
+    distinct(Fishery_lab, vessel, shot_id, target_catch, bycatch_type_label, fshry_spp, bycatch_cnt) %>%
+    group_by(fshry_spp, Fishery_lab, vessel) %>%
+    summarise(avg_target = mean(target_catch),
+              se_target= plotrix::std.error(target_catch),
+              avg_bycatch = mean(bycatch_cnt),
+              se_bycatch = plotrix::std.error(bycatch_cnt)) %>%
+    ggplot(aes(x=avg_target, y=avg_bycatch, color=Fishery_lab)) +
+    geom_errorbar(aes(x=avg_target, y=avg_bycatch, ymin=avg_bycatch-se_bycatch, ymax=avg_bycatch+se_bycatch, color=Fishery_lab),
+                  size=0.2) +
+    geom_errorbar(aes(x=avg_target, y=avg_bycatch, xmin=avg_target-se_target, xmax=avg_target+se_target, color=Fishery_lab),
+                  size=0.2) +
+    geom_point(aes(color=Fishery_lab), size=1) +
+    scale_color_manual(values=pal_fishery) +
+    facet_wrap(~fshry_spp,
+               scales= "free",
+               labeller = as_labeller(c('Tuna longlines Seabirds'="Seabirds", `Tuna longlines Sea turtles`="Sea turtles", `Tuna longlines Shortfin mako`="Shortfin mako", `Prawn trawl Syngnathids`="Syngnathids", `Prawn trawl Hammerhead sharks`="Hammerhead sharks", `Prawn trawl Sea snakes`="Sea snakes", `Prawn trawl Sawfishes`="Sawfishes", `Otter bottom trawl Seabirds`="Seabirds", `Otter bottom trawl Pinnipeds`="Pinnipeds", `Demersal longlines Seabirds`="Seabirds", `Demersal longlines Gulper sharks`="Gulper sharks", `Demersal longlines School shark`="School shark", `Set gillnets Seabirds`="Seabirds", `Set gillnets Hammerhead sharks`="Hammerhead sharks", `Set gillnets Dolphins`="Dolphins"))) + 
+    scale_x_continuous(expand=c(0.1, 0.1)) +
+    scale_y_continuous(expand=c(0.05, 0)) +
+    labs(x = "Target catch per vessel (avg. counts or kg)", y = "Non-target interactions per vessel (avg. count)") +
+    theme(panel.grid = element_blank(),
+          panel.background = element_rect(fill = NA, color = "black"),
+          strip.background = element_rect(fill = "white", color="black"),
+          strip.text.x = element_text(margin = margin(2, 0, 2, 0), size=8),
+          axis.text = element_text(size = 8),
+          legend.position=c(0.88, 0.1), 
+          legend.spacing.y = unit(0.05, "cm"),
+          legend.text = element_text(size = 8),
+          legend.margin=margin(0,0,0,0),
+          legend.box.margin=margin(-5,-5,-5,-5),
+          legend.title=element_blank(),
+          legend.key = element_rect(fill = NA),
+          #legend.key = element_rect(fill = NA)
+          )
+fig1.p
+
+```
+

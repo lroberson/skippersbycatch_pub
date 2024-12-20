@@ -1,0 +1,151 @@
+---
+title: "Figure3"
+author: "Leslie Roberson"
+date: "28/01/2022"
+output: html_document
+---
+
+## Summary
+
+This is the data and code needed to reproduce the raw version of Figure 3 (plot of bycatch species pairs correlation coefficients). 
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(here)
+library(forcats)
+library(lisa)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# correlation test function
+using cor()
+```{r cortest}
+# Custom function to get quantiles and mean and format as dataframe
+get_stats <- function(sp1, sp2) {
+  NoSamples <- 1000
+  CC <- rep(NA, NoSamples)
+  sum1 <- summary(get(sp1)) # get() the value of a named object
+  sum2 <- summary(get(sp2))
+  for(i in 1:NoSamples) {
+    Index1 <- grep("VSL|VESSEL|vessel|Vessel", names(sum1$p.coeff))
+    Sp1 <- rnorm(sum1$p.coeff[Index1], sum1$se[Index1])
+    Index2 <- grep("VSL|VESSEL|vessel|Vessel", names(sum2$p.coeff))
+    Sp2 <- rnorm(sum2$p.coeff[Index2], sum2$se[Index2])
+    CC[i] <- cor(Sp1,Sp2, method="pearson") 
+  }
+  quantile(CC, na.rm=TRUE) %>% 
+    t() %>% # transpose
+    as.data.frame() %>%
+    rename_with(~ paste("quant",
+                        gsub("%", "", .x),
+                        sep = "_")) %>% # rename columns
+    mutate(mean_cc = mean(CC)) # add mean column
+}
+
+# run custom function on each correspondence
+full_table <- corresp.keep %>% 
+  # summarise row by row
+  rowwise(everything()) %>% 
+  summarise(get_stats(sp1, sp2), .groups = "drop") %>% 
+  filter(sp1 != sp2)
+
+```
+
+## prep data
+
+```{r prep data}
+
+fig3.dat <- read_csv("_data/fig3_dat.csv")
+names(fig3.dat)
+# mean_cc: average of 1000 bootstrapped correlation coefficient estimates
+# pairs_plot: the bycatch_type/fishery pairs
+# fishery: ETBF = tuna longlines, GNS= set gillnets, LLA = demersal longlines, OTB = otter bottom trawl, NPF = prawn trawl
+
+## make col for fishery 
+fig3.dat <- fig3.dat %>%
+  mutate(fishery = case_when(
+    grepl("etbf", sp1, ignore.case = TRUE) ~ "ETBF",
+    grepl("npf", sp1, ignore.case = TRUE) ~ "NPF",
+    grepl("gns", sp1, ignore.case = TRUE) ~ "GNS",
+    grepl("lla", sp1, ignore.case = TRUE) ~ "LLA",
+    grepl("otb", sp1, ignore.case = TRUE) ~ "OTB",
+    TRUE ~ as.character(NA)
+  ))
+
+## clean spp pairs
+remove <- c("fe|etbf|npf|gns|otb|lla")
+fig3.dat <- fig3.dat %>% mutate(pairs_plot = gsub(remove, "", pairs))
+# remove punctuation
+fig3.dat <- fig3.dat %>% mutate(pairs_plot = gsub("[[:punct:]]", " ", pairs_plot))
+# change to upper case so I don't lose where words start
+fig3.dat <- fig3.dat %>% mutate(pairs_plot = stringr::str_to_title(pairs_plot))
+# now remove spaces
+fig3.dat <- fig3.dat %>% mutate(pairs_plot = gsub(" ", "", pairs_plot))
+# now add the fishery to the name so they're recognized as separate
+fig3.dat <- fig3.dat %>% unite("pairs_plot", fishery:pairs_plot, remove=FALSE) 
+
+## color palette
+pal_fishery <- lisa::lisa_palette("MarcChagall", 5, "discrete")
+
+## reorder pairs by fishery then mean CC value
+fig3.dat <- fig3.dat %>% arrange(fishery, desc(mean_cc))
+fig3.dat$pairs_plot <- as_factor(fig3.dat$pairs_plot)
+levels(fig3.dat$pairs_plot)
+
+fig3.dat <- fig3.dat %>% arrange(fishery, desc(mean_cc))
+fig3.dat$pairs_plot <- factor(fig3.dat$pairs_plot)
+
+fig3.dat$pairs_lab <- fct_recode(fig3.dat$pairs_plot,
+                            "Dolphins-Hammerheads" = "GNS_DolphinsHammers",
+                            "Seabirds-Dolphins"="GNS_BirdsDolphins",
+                            "Seabirds-Hammerheads"="GNS_BirdsHammers",
+                            "Seabirds-Gulper sharks"="LLA_BirdsGulpers",
+                            "Seabirds-School shark"="LLA_BirdsSsh",
+                            "Gulper sharks-School shark"="LLA_GulpersSsh",
+                            "Seabirds-Pinnipeds"="OTB_BirdsPinns",
+                            "Seabirds-Sea turtles"="ETBF_BirdsTurtles",
+                            "Seabirds-Shortfin mako"="ETBF_BirdsMakos",
+                            "Shortfin mako-Sea turtles"="ETBF_MakosTurtles",
+                            "Hammerheads-Syngnathids"="NPF_HammersSyngs",
+                            "Sawfish-Syngnathids"="NPF_SawfishSyngs",
+                            "Hammerheads-Sawfish"="NPF_HammersSawfish",
+                            "Sea snakes-Syngnathids"="NPF_SeasnakesSyngs",
+                            "Sawfish-Sea snakes"="NPF_SawfishSeasnakes",
+                            "Hammerheads-Sea snakes"="NPF_HammersSeasnakes")
+
+fig3.dat$pairs_lab <- fct_relevel(fig3.dat$pairs_lab, c("Dolphins-Hammerheads", "Seabirds-Dolphins", "Seabirds-Hammerheads", "Seabirds-Gulper sharks", "Seabirds-School shark", "Gulper sharks-School shark", "Seabirds-Pinnipeds", "Seabirds-Sea turtles", "Seabirds-Shortfin mako", "Shortfin mako-Sea turtles", "Hammerheads-Syngnathids", "Sawfish-Syngnathids", "Hammerheads-Sawfish", "Sea snakes-Syngnathids", "Sawfish-Sea snakes", "Hammerheads-Sea snakes"))
+fig3.dat$fishery <- fct_relevel(fig3.dat$fishery, c("GNS","LLA","OTB","ETBF","NPF"))
+
+fig3.dat$Fishery_lab <- fct_recode(fig3.dat$fishery, 
+                                 "Set \ngillnets" = "GNS",
+                                 "Demersal \nlonglines" ="LLA",
+                                 "Otter \ntrawls" = "OTB",
+                                 "Tuna \nlonglines" = "ETBF",
+                                 "Prawn \ntrawl" = "NPF")
+levels(fig3.dat$Fishery_lab)
+levels(fig3.dat$fishery)
+levels(fig3.dat$pairs_lab)
+```
+
+## plot
+horizontal bar plot
+```{r fig 3 plot}
+fig3.p <- fig3.dat %>%
+  ggplot() +
+  geom_bar(aes(x=pairs_lab, y=mean_cc, fill=Fishery_lab), stat="identity") +
+  geom_errorbar(aes(x=pairs_lab, ymin=quant_25, ymax=quant_75), colour="black", size=0.3) +
+  # reverse axis so larger fig3.dat are at top 
+  scale_x_discrete(limits = rev) +
+  scale_y_continuous(limits=c(-0.15,0.35), breaks=seq(-0.1,0.3,0.1)) +
+  coord_flip() +
+  scale_fill_manual(values=pal_fishery) +
+  labs(y="Correlation coefficient", x = "") +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.background = element_rect(fill="NA", color="black"))
+fig3.p
+```
+
